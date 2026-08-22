@@ -12,7 +12,7 @@ The page is one self-contained file of approximately 10 MB.
 
 ## What is on screen
 
-**Wednesday 26 August 2026**, from gtfs.de feeds based on DELFI data: 40,249 trains at 6,537 stations.
+**Wednesday 26 August 2026**, from gtfs.de feeds based on DELFI data: 40,229 trains at 6,537 stations.
 
 | Category | Trips | Drawn as |
 |---|---|---|
@@ -20,7 +20,6 @@ The page is one self-contained file of approximately 10 MB.
 | **IC / EC** | 409 | intercity, full-size dot |
 | **RE / RB / MEX** | 23,343 | regional, small dot |
 | **S-Bahn** | 15,740 | suburban rail, smallest dot |
-| **NJ / EN** | 20 | night services, **yellow** |
 
 S-Bahn is included as a separate category. U-Bahn, tram, bus, dial-a-ride, and rail-replacement buses are excluded.
 Each train has a tail that shows its direction. S-Bahn trains use the shortest tail and smallest dot to limit city-level density.
@@ -54,8 +53,7 @@ empty bands; a wide desktop gets the neighbours. On
 phones the map keeps a full screen to itself and the legend, figures and
 controls sit below the fold.
 
-The builder identifies NightJet and EuroNight route names. It also identifies N-suffixed DELFI lines when their route type is 102.
-Ordinary ICE and IC services stay in their categories when they finish after midnight.
+The builder excludes NightJet, EuroNight, and other sleeper services.
 
 ## The data
 
@@ -128,7 +126,6 @@ The map uses one near-black surface. The five category colors stay visible again
 | intercity | `#ff7a45` |
 | regional | `#35d69a` |
 | S-Bahn | `#d889ff` |
-| night | `#ffd93d` |
 
 The marks are small enough that pixel geometry matters. Device pixel ratio is
 honoured up to 3x, and any dot whose radius falls below about 1.3 device pixels
@@ -143,5 +140,5 @@ alone: around 60 fps with 1,660 trains on screen at 3x pixel density. The day
 profile is likewise drawn once per resize and blitted.
 
 Origin rings come from a time-sorted event index — one entry per service — so
-each frame binary-searches the live window instead of rescanning 40,249 trips. Ring lifetime scales with the playback multiplier, so
+each frame binary-searches the live window instead of rescanning 40,229 trips. Ring lifetime scales with the playback multiplier, so
 an event stays visible for roughly two thirds of a second at any speed.

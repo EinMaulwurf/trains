@@ -22,7 +22,6 @@ CLASSES = [
     ("intercity",r"^(IC|EC|D)(?=[ \d]|$)"),
     ("regional", r"^(IRE|RE|RB|IR|MEX|DZ|ALX|BRB|ERB|EVB|HLB|NWB|ODEG|VIA|WFB)(?=[ \d]|$)"),
     ("s_bahn",   r"^S(?=[ \d]|$)"),
-    ("night",    r"^(NJ|EN|DN|CNL)(?=[ \d]|$)"),
 ]
 DROP = re.compile(r"^(U|STR|Bus|Str|Tram|SEV)(?=[ \d]|$)", re.I)
 
@@ -67,12 +66,12 @@ def classify(route):
         return None, name
     if rt == 109:
         return "s_bahn", name
-    if NIGHT_NAME.match(name) or rt == 105:          # 105 = sleeper rail
-        return "night", name
+    if NIGHT_NAME.match(name) or rt == 105:          # sleeper rail
+        return None, name
     if rt == 101:                                    # high-speed rail
         return ("regional", name) if REGIONAL_NAME.match(name) else ("ice", name)
     if rt == 102 and NIGHT_LINE.match(name):
-        return "night", name
+        return None, name
     if rt == 102:                                    # long-distance rail
         for cls, pat in CLASSES:
             if re.match(pat, name):
@@ -206,9 +205,8 @@ def main():
         name = t["name"]
         # Bare line numbers ("17", "12N") mean nothing on hover; give them
         # their category's prefix.
-        if name.isdigit() or (t["cls"] == "night" and NIGHT_LINE.match(name)):
-            name = {"ice": "ICE ", "intercity": "IC ",
-                    "night": "NJ "}.get(t["cls"], "") + name
+        if name.isdigit():
+            name = {"ice": "ICE ", "intercity": "IC "}.get(t["cls"], "") + name
         out_trips.append({"c": classes.index(t["cls"]), "n": name,
                           "h": t["head"], "s": seq})
         counts[t["cls"]] += 1
