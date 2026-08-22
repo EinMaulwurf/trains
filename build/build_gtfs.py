@@ -9,8 +9,8 @@ regional feed covering the same service date. Feed-local IDs never collide
 across sources because each feed is namespaced internally.
 
 The feed must contain agency/routes/trips/stops/stop_times plus calendar.txt
-and/or calendar_dates.txt. Only rail is kept; buses and urban transit
-(S-Bahn, U-Bahn, tram) are dropped -- see CLASSES and DROP below.
+and/or calendar_dates.txt. Mainline rail and S-Bahn are kept; U-Bahn, tram,
+bus, and other urban modes are dropped -- see CLASSES and DROP below.
 """
 import argparse, csv, json, os, sys, datetime, math, re
 
@@ -21,9 +21,10 @@ CLASSES = [
     ("ice",      r"^(ICE|ECE|TGV|RJX?)(?=[ \d]|$)"),
     ("intercity",r"^(IC|EC|D)(?=[ \d]|$)"),
     ("regional", r"^(IRE|RE|RB|IR|MEX|DZ|ALX|BRB|ERB|EVB|HLB|NWB|ODEG|VIA|WFB)(?=[ \d]|$)"),
+    ("s_bahn",   r"^S(?=[ \d]|$)"),
     ("night",    r"^(NJ|EN|DN|CNL)(?=[ \d]|$)"),
 ]
-DROP = re.compile(r"^(S|U|STR|Bus|Str|Tram|SEV)(?=[ \d]|$)", re.I)
+DROP = re.compile(r"^(U|STR|Bus|Str|Tram|SEV)(?=[ \d]|$)", re.I)
 
 # GTFS route_type values that are urban transit, dropped regardless of name.
 DROP_TYPES = {0, 1, 3, 4, 5, 6, 7, 11, 12}
@@ -62,8 +63,10 @@ def classify(route):
     # 2 = rail; 100-117 = extended rail. 109 is S-Bahn, 200+ coach/bus/etc.
     if rt != 2 and not (100 <= rt <= 117):
         return None, name
-    if rt in DROP_TYPES or rt == 109:
+    if rt in DROP_TYPES:
         return None, name
+    if rt == 109:
+        return "s_bahn", name
     if NIGHT_NAME.match(name) or rt == 105:          # 105 = sleeper rail
         return "night", name
     if rt == 101:                                    # high-speed rail
