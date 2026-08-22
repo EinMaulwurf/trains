@@ -23,6 +23,7 @@ The page is one self-contained file of approximately 10 MB.
 
 S-Bahn is included as a separate category. U-Bahn, tram, bus, dial-a-ride, and rail-replacement buses are excluded.
 Each train has a tail that shows its direction. S-Bahn trains use the shortest tail and smallest dot to limit city-level density.
+Select a category in the legend to show or hide its trains, origin rings, and starts in the day profile.
 Only the largest cities have labels. A faint outline of Germany and its state borders gives orientation.
 
 The animation opens at the quietest minute of the day, found by scanning

@@ -70,6 +70,8 @@
     color:var(--ink-3);font-weight:500;margin-bottom:9px;
   }
   .lg{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:0.83rem}
+  .lg input{width:14px;height:14px;margin:0;cursor:pointer;flex:0 0 auto}
+  .lg.off .sw,.lg.off .nm,.lg.off .ct{opacity:0.35}
   .sw{border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 2px var(--panel)}
   .lg .nm{flex:1 1 auto;color:var(--ink)}
   .lg .ct{
@@ -271,6 +273,7 @@ const CLASS_META = {
               role:"sbahn", size:0.24, secs:240, trail:2, ring:0.06},
 };
 const CLASSES = DATA.classes || ["ice","intercity","regional","s_bahn"];
+const ENABLED = CLASSES.map(() => true);
 
 const DAY_SECONDS = 86400;
 
@@ -380,7 +383,7 @@ const DOT_SCALE  = CLASSES.map(k => (CLASS_META[k] || {}).size ?? 1);
 const EVN = TRIPS.length;
 const EVT = new Int32Array(EVN), EVS = new Int32Array(EVN);
 const EVC = new Uint8Array(EVN);
-const STARTS_MIN = new Int32Array(1440);
+const STARTS_CLASS = CLASSES.map(() => new Int32Array(1440));
 {
   const raw = TRIPS.map(t => {
     const a = t.s[0];
@@ -389,7 +392,7 @@ const STARTS_MIN = new Int32Array(1440);
   raw.sort((x,y) => x[0]-y[0]);
   raw.forEach((e,i) => {
     EVT[i]=e[0]; EVS[i]=e[1]; EVC[i]=e[2];
-    STARTS_MIN[Math.floor(e[0]/60) % 1440]++;
+    STARTS_CLASS[e[2]][Math.floor(e[0]/60) % 1440]++;
   });
 }
 
@@ -532,8 +535,12 @@ function sizeProfile(){
   const bins = Math.max(48, Math.min(240, Math.floor(plotW)));
   const per = 1440/bins;
   const up = new Float64Array(bins);
-  for (let m = 0; m < 1440; m++)
-    up[Math.min(bins-1, Math.floor(m/per))] += STARTS_MIN[m];
+  for (let m = 0; m < 1440; m++){
+    let starts = 0;
+    for (let i = 0; i < CLASSES.length; i++)
+      if (ENABLED[i]) starts += STARTS_CLASS[i][m];
+    up[Math.min(bins-1, Math.floor(m/per))] += starts;
+  }
   let peak = 1;
   for (let b = 0; b < bins; b++) peak = Math.max(peak, up[b]);
 
@@ -637,6 +644,7 @@ function draw(){
   /* --- trains --- */
   hitList = [];
   for (const t of TRIPS){
+    if (!ENABLED[t.c]) continue;
     const meta = CLASS_META[CLASSES[t.c]] || {size:1};
     /* A trip running past midnight is drawn twice: its own day, and wrapped. */
     for (const off of (t.t1 > DAY_SECONDS ? [0, DAY_SECONDS] : [0])){
@@ -708,6 +716,7 @@ function draw(){
       const st = ST[EVS[idx]];
       if (st.x < -20 || st.x > W+20 || st.y < -20 || st.y > H+20) return;
       const cls = EVC[idx];
+      if (!ENABLED[cls]) return;
       /* The ring starts just clear of the train's own dot and only its travel
          is scaled. Scaling the whole radius instead put a small ring inside
          its dot, where there was nothing to see. Stroke width is never scaled
@@ -778,11 +787,12 @@ function drawKey(hues, bgBot){
     const cy = y + PADY + ROW*i + ROW/2;
     ctx.beginPath();
     ctx.arc(x + PADX + DOT, cy, DOT, 0, 6.2832);
-    ctx.fillStyle = rgba(hues[i], 1);
+    const alpha = ENABLED[i] ? 1 : 0.25;
+    ctx.fillStyle = rgba(hues[i], alpha);
     ctx.fill();
-    ctx.fillStyle = rgba(pick("ink2"), 0.95);
+    ctx.fillStyle = rgba(pick("ink2"), 0.95 * alpha);
     ctx.fillText(r.code, x + PADX + DOT*2 + 5, cy);
-    ctx.fillStyle = rgba(pick("ink3"), 0.9);
+    ctx.fillStyle = rgba(pick("ink3"), 0.9 * alpha);
     ctx.fillText(r.word, x + PADX + DOT*2 + 5 + codeW, cy);
   });
 }
@@ -826,17 +836,28 @@ function updateChrome(){
     const meta = CLASS_META[k] || {label:k, role:"ic", size:1};
     const d = Math.max(5, Math.round(12*meta.size/maxSize));
     rows.insertAdjacentHTML("beforeend",
-      '<div class="lg"><span class="sw" style="background:var(--'+meta.role+
+      '<label class="lg"><input type="checkbox" checked data-class="'+i+
+      '" aria-label="Show '+meta.label+'"><span class="sw" style="background:var(--'+meta.role+
       ');width:'+d+'px;height:'+d+'px;margin:0 '+((12-d)/2)+'px"></span>'+
       '<span class="nm">'+meta.label+'</span>'+
-      '<span class="ct" id="lg-count-'+i+'">0</span></div>');
+      '<span class="ct" id="lg-count-'+i+'">0</span></label>');
+  });
+  rows.querySelectorAll('input[data-class]').forEach(input => {
+    input.style.accentColor = 'var(--'+CLASS_META[CLASSES[+input.dataset.class]].role+')';
+    input.addEventListener("change", () => {
+      const i = +input.dataset.class;
+      ENABLED[i] = input.checked;
+      input.closest(".lg").classList.toggle("off", !input.checked);
+      lastMinute = -1;
+      sizeProfile();
+    });
   });
   const scopeNote = DATA.note
     ? " " + DATA.note.split(" \u2014 ")[0].replace(/\.\s*$/,"") + "."
     : "";
   const includesSBahn = CLASSES.includes("s_bahn");
   document.getElementById("legend-note").textContent =
-    "Count = trains moving at this minute. Dot size follows category; regional " +
+    "Select a category to show or hide it. Count = trains moving at this minute. Dot size follows category; regional " +
     "and S-Bahn are drawn small. A ring opens where a service begins; the strip by the " +
     "scrubber counts those starts across the day. " +
     (includesSBahn
