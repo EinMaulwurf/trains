@@ -57,6 +57,15 @@
     font-family:"IBM Plex Mono",monospace;
   }
 
+  #zoom-controls{
+    position:absolute;z-index:4;left:20px;top:76px;
+    display:flex;align-items:center;gap:5px;padding:5px;
+  }
+  #zoom-controls button{min-width:30px;padding:4px 7px;font-family:"IBM Plex Mono",monospace}
+  #zoom-reset{min-width:42px!important;font-size:0.7rem!important}
+  #map.can-pan{cursor:grab;touch-action:none}
+  #map.is-panning{cursor:grabbing}
+
   /* ---- panels --------------------------------------------------------- */
   .panel{
     background:var(--panel);
@@ -168,6 +177,7 @@
     body{overflow:auto;overflow-x:hidden}
     #stage{position:relative;inset:auto;width:100%;height:100svh;height:100dvh}
     #meta,#figbtn{display:none}
+    #zoom-controls{left:10px;top:10px}
     #dock{
       display:flex;flex-direction:column;gap:12px;
       padding:12px 12px 20px;
@@ -194,6 +204,11 @@
     <div id="running">&nbsp;</div>
   </header>
   <div id="meta"></div>
+  <div id="zoom-controls" class="panel" role="group" aria-label="Map zoom">
+    <button type="button" data-zoom="out" aria-label="Zoom out">&minus;</button>
+    <button type="button" id="zoom-reset" data-zoom="reset" aria-label="Reset map zoom">1&times;</button>
+    <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+  </div>
   <div id="hint">Scroll for legend and controls<span>&#8964;</span></div>
 </div>
 
@@ -422,16 +437,27 @@ let profW = 0, profH = 0;
 const cv = document.getElementById("map");
 const ctx = cv.getContext("2d", {alpha:false});
 let W=0, H=0, SX=0, SY=0, OX=0, OY=0, DPR=1;
+let MAP_ZOOM=1, PAN_X=0, PAN_Y=0;
 let pathLand = null, pathStates = null;
 /* Sky, land and the ~10,000 station dots never move; they re-render only on
    resize or the sunset flip, and each frame starts from this cached bitmap. */
 const base = document.createElement("canvas");
 let baseReady = false;
 
+const mapX = lon => W/2 + (OX + ux(lon)*SX - W/2)*MAP_ZOOM + PAN_X;
+const mapY = lat => H/2 + (OY + uy(lat)*SY - H/2)*MAP_ZOOM + PAN_Y;
+
+function projectMap(){
+  for (const s of ST){ s.x = mapX(s.lon); s.y = mapY(s.lat); }
+  buildBasemap();
+  baseReady = false;
+  renderBase();
+}
+
 function buildBasemap(){
   const ring = (path, r) => {
-    path.moveTo(OX + ux(r[0][0])*SX, OY + uy(r[0][1])*SY);
-    for (let i=1;i<r.length;i++) path.lineTo(OX + ux(r[i][0])*SX, OY + uy(r[i][1])*SY);
+    path.moveTo(mapX(r[0][0]), mapY(r[0][1]));
+    for (let i=1;i<r.length;i++) path.lineTo(mapX(r[i][0]), mapY(r[i][1]));
     path.closePath();
   };
   pathLand = new Path2D();
@@ -445,6 +471,7 @@ function resize(){
   W = stage.clientWidth; H = stage.clientHeight;
   if (!W || !H) return;
   DPR = dpr;
+  MAP_ZOOM = 1; PAN_X = 0; PAN_Y = 0;
   cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
   baseReady = false;
@@ -466,11 +493,10 @@ function resize(){
      width-limited and dead space below reads better than above. */
   OY = PAD + (availH-h)*0.40;
 
-  for (const s of ST){ s.x = OX + ux(s.lon)*SX; s.y = OY + uy(s.lat)*SY; }
-  buildBasemap();
-  renderBase();
+  projectMap();
   placeClock();
   sizeProfile();
+  updateZoomControls();
 }
 
 /* Park the clock on its Baltic anchor, clamped so it can never leave the
@@ -911,7 +937,74 @@ window.addEventListener("keydown", e => {
   if (e.code === "Space" && e.target.tagName !== "INPUT"){ e.preventDefault(); playBtn.click(); }
 });
 
+const zoomReset = document.getElementById("zoom-reset");
+function updateZoomControls(){
+  zoomReset.textContent = (Math.round(MAP_ZOOM*10)/10) + "\u00d7";
+  document.querySelector('[data-zoom="out"]').disabled = MAP_ZOOM <= 1;
+  zoomReset.disabled = MAP_ZOOM <= 1;
+  cv.classList.toggle("can-pan", MAP_ZOOM > 1);
+}
+function clampPan(){
+  const maxX = W * (MAP_ZOOM-1) / 2;
+  const maxY = H * (MAP_ZOOM-1) / 2;
+  PAN_X = Math.max(-maxX, Math.min(maxX, PAN_X));
+  PAN_Y = Math.max(-maxY, Math.min(maxY, PAN_Y));
+}
+function zoomAt(factor, x=W/2, y=H/2){
+  const old = MAP_ZOOM;
+  const next = Math.max(1, Math.min(8, old*factor));
+  if (next === old) return;
+  const qx = (x-W/2-PAN_X)/old;
+  const qy = (y-H/2-PAN_Y)/old;
+  MAP_ZOOM = next;
+  PAN_X = x-W/2-qx*next;
+  PAN_Y = y-H/2-qy*next;
+  if (next === 1){ PAN_X = 0; PAN_Y = 0; }
+  clampPan();
+  projectMap();
+  updateZoomControls();
+  elTip.setAttribute("data-on","false");
+}
+document.getElementById("zoom-controls").addEventListener("click", e => {
+  const action = e.target.dataset.zoom;
+  if (action === "in") zoomAt(1.5);
+  else if (action === "out") zoomAt(1/1.5);
+  else if (action === "reset") zoomAt(1/MAP_ZOOM);
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY*0.0015), e.clientX-r.left, e.clientY-r.top);
+}, {passive:false});
+
+let panning = false, panPointer = null, panLastX = 0, panLastY = 0;
+cv.addEventListener("pointerdown", e => {
+  if (panning || MAP_ZOOM <= 1 || (e.pointerType === "mouse" && e.button !== 0)) return;
+  panning = true; panLastX = e.clientX; panLastY = e.clientY;
+  panPointer = e.pointerId;
+  cv.setPointerCapture(e.pointerId);
+  cv.classList.add("is-panning");
+  elTip.setAttribute("data-on","false");
+});
+cv.addEventListener("pointermove", e => {
+  if (!panning || e.pointerId !== panPointer) return;
+  PAN_X += e.clientX-panLastX; PAN_Y += e.clientY-panLastY;
+  panLastX = e.clientX; panLastY = e.clientY;
+  clampPan();
+  projectMap();
+});
+const stopPan = e => {
+  if (!panning || e.pointerId !== panPointer) return;
+  panning = false;
+  panPointer = null;
+  cv.classList.remove("is-panning");
+  if (cv.hasPointerCapture(e.pointerId)) cv.releasePointerCapture(e.pointerId);
+};
+cv.addEventListener("pointerup", stopPan);
+cv.addEventListener("pointercancel", stopPan);
+
 cv.addEventListener("mousemove", e => {
+  if (panning) return;
   const r = cv.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   let best = null, bestD = 14*14;

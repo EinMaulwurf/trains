@@ -46,6 +46,8 @@ the nearest station is far enough away that it never covers the network. Giving
 it open water rather than a reserved band hands the whole stage to the map.
 
 Hover a train for its line and destination. Space bar toggles playback.
+Use the map buttons or the mouse wheel to zoom. Drag the map to pan when it is zoomed.
+The canvas redraws the map at each zoom level, so lines and labels stay sharp.
 
 The window itself adapts to its container: whichever axis has room to spare is widened
 towards the reach of the feed's international services. A phone in portrait
