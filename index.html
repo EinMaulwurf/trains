@@ -63,7 +63,8 @@
   }
   #zoom-controls button{min-width:30px;padding:4px 7px;font-family:"IBM Plex Mono",monospace}
   #zoom-reset{min-width:42px!important;font-size:0.7rem!important}
-  #map.can-pan{cursor:grab;touch-action:none}
+  #map{touch-action:pan-y}
+  #map.can-pan{cursor:grab}
   #map.is-panning{cursor:grabbing}
 
   /* ---- panels --------------------------------------------------------- */
@@ -950,20 +951,23 @@ function clampPan(){
   PAN_X = Math.max(-maxX, Math.min(maxX, PAN_X));
   PAN_Y = Math.max(-maxY, Math.min(maxY, PAN_Y));
 }
-function zoomAt(factor, x=W/2, y=H/2){
+function zoomBetween(factor, fromX, fromY, toX, toY){
   const old = MAP_ZOOM;
   const next = Math.max(1, Math.min(8, old*factor));
-  if (next === old) return;
-  const qx = (x-W/2-PAN_X)/old;
-  const qy = (y-H/2-PAN_Y)/old;
+  if (next === old && fromX === toX && fromY === toY) return;
+  const qx = (fromX-W/2-PAN_X)/old;
+  const qy = (fromY-H/2-PAN_Y)/old;
   MAP_ZOOM = next;
-  PAN_X = x-W/2-qx*next;
-  PAN_Y = y-H/2-qy*next;
+  PAN_X = toX-W/2-qx*next;
+  PAN_Y = toY-H/2-qy*next;
   if (next === 1){ PAN_X = 0; PAN_Y = 0; }
   clampPan();
   projectMap();
   updateZoomControls();
   elTip.setAttribute("data-on","false");
+}
+function zoomAt(factor, x=W/2, y=H/2){
+  zoomBetween(factor, x, y, x, y);
 }
 document.getElementById("zoom-controls").addEventListener("click", e => {
   const action = e.target.dataset.zoom;
@@ -978,8 +982,28 @@ cv.addEventListener("wheel", e => {
 }, {passive:false});
 
 let panning = false, panPointer = null, panLastX = 0, panLastY = 0;
+const touches = new Map();
+let pinch = null;
+const touchPoint = e => {
+  const r = cv.getBoundingClientRect();
+  return {x:e.clientX-r.left, y:e.clientY-r.top};
+};
+const pinchState = () => {
+  const [a,b] = [...touches.values()];
+  if (!a || !b) return null;
+  return {x:(a.x+b.x)/2, y:(a.y+b.y)/2, d:Math.hypot(a.x-b.x,a.y-b.y)};
+};
 cv.addEventListener("pointerdown", e => {
-  if (panning || MAP_ZOOM <= 1 || (e.pointerType === "mouse" && e.button !== 0)) return;
+  if (e.pointerType === "touch"){
+    touches.set(e.pointerId, touchPoint(e));
+    if (touches.size === 2){
+      pinch = pinchState();
+      for (const id of touches.keys()) cv.setPointerCapture(id);
+      elTip.setAttribute("data-on","false");
+    }
+    return;
+  }
+  if (panning || MAP_ZOOM <= 1 || e.button !== 0) return;
   panning = true; panLastX = e.clientX; panLastY = e.clientY;
   panPointer = e.pointerId;
   cv.setPointerCapture(e.pointerId);
@@ -987,6 +1011,15 @@ cv.addEventListener("pointerdown", e => {
   elTip.setAttribute("data-on","false");
 });
 cv.addEventListener("pointermove", e => {
+  if (e.pointerType === "touch" && touches.has(e.pointerId)){
+    touches.set(e.pointerId, touchPoint(e));
+    const next = pinchState();
+    if (pinch && next && pinch.d > 0){
+      zoomBetween(next.d/pinch.d, pinch.x, pinch.y, next.x, next.y);
+      pinch = next;
+    }
+    return;
+  }
   if (!panning || e.pointerId !== panPointer) return;
   PAN_X += e.clientX-panLastX; PAN_Y += e.clientY-panLastY;
   panLastX = e.clientX; panLastY = e.clientY;
@@ -994,6 +1027,12 @@ cv.addEventListener("pointermove", e => {
   projectMap();
 });
 const stopPan = e => {
+  if (e.pointerType === "touch"){
+    touches.delete(e.pointerId);
+    pinch = touches.size >= 2 ? pinchState() : null;
+    if (cv.hasPointerCapture(e.pointerId)) cv.releasePointerCapture(e.pointerId);
+    return;
+  }
   if (!panning || e.pointerId !== panPointer) return;
   panning = false;
   panPointer = null;

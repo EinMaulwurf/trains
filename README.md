@@ -47,6 +47,7 @@ it open water rather than a reserved band hands the whole stage to the map.
 
 Hover a train for its line and destination. Space bar toggles playback.
 Use the map buttons or the mouse wheel to zoom. Drag the map to pan when it is zoomed.
+On a phone, use two fingers to zoom and pan. One-finger vertical movement scrolls to the controls below the map.
 The canvas redraws the map at each zoom level, so lines and labels stay sharp.
 
 The window itself adapts to its container: whichever axis has room to spare is widened
