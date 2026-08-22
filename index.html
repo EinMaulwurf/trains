@@ -471,10 +471,21 @@ function buildBasemap(){
 
 function resize(){
   const dpr = Math.min(window.devicePixelRatio||1, 3);
+  /* Mobile browser chrome changes the dynamic viewport height while the page
+     scrolls. Preserve the geographic point at the camera centre when that
+     resize happens, instead of snapping a zoomed map back to its overview. */
+  let camera = null;
+  if (MAP_ZOOM > 1 && W && H && SX && SY){
+    const baseX = W/2 - PAN_X/MAP_ZOOM;
+    const baseY = H/2 - PAN_Y/MAP_ZOOM;
+    camera = {
+      lon: VIEW.lon0 + ((baseX-OX)/SX) * (VIEW.lon1-VIEW.lon0),
+      lat: VIEW.lat1 - ((baseY-OY)/SY) * (VIEW.lat1-VIEW.lat0),
+    };
+  }
   W = stage.clientWidth; H = stage.clientHeight;
   if (!W || !H) return;
   DPR = dpr;
-  MAP_ZOOM = 1; PAN_X = 0; PAN_Y = 0;
   cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
   baseReady = false;
@@ -495,6 +506,16 @@ function resize(){
   /* Bias upward rather than centring: on a portrait screen the frame is
      width-limited and dead space below reads better than above. */
   OY = PAD + (availH-h)*0.40;
+
+  if (camera){
+    const baseX = OX + ux(camera.lon)*SX;
+    const baseY = OY + uy(camera.lat)*SY;
+    PAN_X = (W/2-baseX)*MAP_ZOOM;
+    PAN_Y = (H/2-baseY)*MAP_ZOOM;
+    clampPan();
+  } else {
+    PAN_X = 0; PAN_Y = 0;
+  }
 
   projectMap();
   placeClock();
