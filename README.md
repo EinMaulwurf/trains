@@ -18,10 +18,12 @@ The page is one self-contained file of approximately 10 MB.
 |---|---|---|
 | **ICE / TGV / RJ** | 737 | high-speed, full-size dot |
 | **IC / EC** | 409 | intercity, full-size dot |
-| **RE / RB / MEX** | 23,343 | regional, small dot |
+| **RE / IRE / MEX** | 7,215 | regional express, small cyan dot |
+| **RB / local** | 16,128 | regional, small green dot |
 | **S-Bahn** | 15,740 | suburban rail, smallest dot |
 
-S-Bahn is included as a separate category. U-Bahn, tram, bus, dial-a-ride, and rail-replacement buses are excluded.
+RE and RB are separate categories. S-Bahn is also a separate category.
+U-Bahn, tram, bus, dial-a-ride, and rail-replacement buses are excluded.
 Each train has a tail that shows its direction. S-Bahn trains use the shortest tail and smallest dot to limit city-level density.
 Select a category in the legend to show or hide its trains, origin rings, and starts in the day profile.
 Only the largest cities have labels. A faint outline of Germany and its state borders gives orientation.
@@ -128,7 +130,8 @@ The map uses one near-black surface. The five category colors stay visible again
 |---|---|
 | high-speed | `#5aa9ff` |
 | intercity | `#ff7a45` |
-| regional | `#35d69a` |
+| regional express | `#41c8e3` |
+| regional and local | `#35d69a` |
 | S-Bahn | `#d889ff` |
 
 The marks are small enough that pixel geometry matters. Device pixel ratio is

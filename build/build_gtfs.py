@@ -20,7 +20,8 @@ import argparse, csv, json, os, sys, datetime, math, re
 CLASSES = [
     ("ice",      r"^(ICE|ECE|TGV|RJX?)(?=[ \d]|$)"),
     ("intercity",r"^(IC|EC|D)(?=[ \d]|$)"),
-    ("regional", r"^(IRE|RE|RB|IR|MEX|DZ|ALX|BRB|ERB|EVB|HLB|NWB|ODEG|VIA|WFB)(?=[ \d]|$)"),
+    ("regional_express", r"^(IRE|RE|MEX)(?=[ \d]|$)"),
+    ("regional", r"^(RB|IR|DZ|ALX|BRB|ERB|EVB|HLB|NWB|ODEG|VIA|WFB)(?=[ \d]|$)"),
     ("s_bahn",   r"^S(?=[ \d]|$)"),
 ]
 DROP = re.compile(r"^(U|STR|Bus|Str|Tram|SEV)(?=[ \d]|$)", re.I)
@@ -45,7 +46,8 @@ NIGHT_NAME = re.compile(r"^(NJ|EN|DN|CNL)(?=[ \d]|$)")
 # intercity: 41 of the 54 night services were drawn as orange IC trains.
 # Scoped to route_type 102, where every N-suffixed line is a night service.
 NIGHT_LINE = re.compile(r"^\d+N$")
-REGIONAL_NAME = re.compile(r"^(IRE|RE|RB|MEX)(?=[ \d]|$)")
+REGIONAL_EXPRESS_NAME = re.compile(r"^(IRE|RE|MEX)(?=[ \d]|$)")
+REGIONAL_NAME = re.compile(r"^RB(?=[ \d]|$)")
 NOISE_NAME = re.compile(r"^(AST|ALT|SEV|EV|Bus|Schiff|RUF)", re.I)
 
 
@@ -69,6 +71,8 @@ def classify(route):
     if NIGHT_NAME.match(name) or rt == 105:          # sleeper rail
         return None, name
     if rt == 101:                                    # high-speed rail
+        if REGIONAL_EXPRESS_NAME.match(name):
+            return "regional_express", name
         return ("regional", name) if REGIONAL_NAME.match(name) else ("ice", name)
     if rt == 102 and NIGHT_LINE.match(name):
         return None, name
